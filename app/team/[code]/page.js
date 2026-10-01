@@ -43,34 +43,71 @@ export default function TeamGame(){
 
   if(!state||!team)return <div className="shell"><div className="formCard card"><h2>Подключение…</h2><p className="muted">Проверяю сессию.</p></div></div>;
 
-  if(round===0)return <div className="shell"><div className="formCard card"><span className="pill">{team.name}</span><h2 style={{fontSize:42}}>Вы подключены</h2><p className="muted">Компания: {team.company}</p><div className="notice">Ждите запуска. Вас ждут 6 управленческих дилемм по 30 секунд.</div></div></div>;
+  if(round===0)return <div className="shell"><div className="formCard card"><span className="pill">УЧАСТНИК · {team.name}</span><h2 style={{fontSize:42}}>Вы подключены</h2><p className="muted">Компания: {team.company}</p><div className="notice">Ждите запуска. Вас ждут 6 управленческих дилемм по 30 секунд.</div></div></div>;
 
   if(state.meta.status==='finished'){
     const r=team.result;
-    if(!r)return <div className="shell"><div className="formCard card"><h2>Формируем результат…</h2></div></div>;
+    const report=r?.hostReport;
+    if(!r||!report)return <div className="shell"><div className="formCard card"><h2>Формируем результат…</h2></div></div>;
     return <div className="shell"><div className="formCard card resultCard">
-      <span className="pill">ВАША ТРАЕКТОРИЯ</span>
-      <h2 className="trajectoryTitle">{r.title}</h2>
-      <p className="trajectoryTag">{r.tagline}</p>
-      <p className="resultText">{r.description}</p>
+      <span className="pill">УЧАСТНИК · {team.name}</span>
+      <h2 style={{fontSize:34,marginBottom:4}}>Компания: {team.company}</h2>
+      <p className="muted">Ваш персональный итог по 6 управленческим решениям</p>
 
-      <div className="metrics">
-        {Object.entries(r.metrics).map(([k,v])=><div className="metric" key={k}>
-          <div className="row"><b>{metricLabels[k]}</b><span>{v}/100{k==='dependency'?' ↓':''}</span></div>
-          <div className="metricBar"><i style={{width:v+'%'}}/></div>
-          {k==='dependency'&&<small>Для этого показателя ниже — лучше.</small>}
-        </div>)}
+      <div className="readAloud" style={{marginTop:18}}>
+        <span className="pill">ИТОГОВАЯ ТРАЕКТОРИЯ</span>
+        <h2 className="trajectoryTitle">{r.title}</h2>
+        <p className="trajectoryTag">{r.tagline}</p>
+        <p className="resultText">{r.description}</p>
       </div>
 
-      <div className="fbgrid" style={{marginTop:18}}>
-        <div className="fb"><b>Сильная сторона стратегии</b><p className="muted">{r.strength}</p></div>
-        <div className="fb"><b>Главный риск</b><p className="muted">{r.risk}</p></div>
+      <div className="reportSection">
+        <h3>1. К какому состоянию пришла компания</h3>
+        <p>{report.opening}</p>
+        <p>{report.state}</p>
       </div>
-      <div className="notice finalQuestion" style={{marginTop:14}}><b>Вопрос вашей команде:</b> {r.question}</div>
 
-      <h3 style={{marginTop:24}}>Ваш путь</h3>
-      <div className="choiceHistory">{r.choices.map(x=><div className="historyRow" key={x.round}><span>0{x.round}</span><div><b>{x.question}</b><p>{x.choice}</p></div></div>)}</div>
-      <p className="muted" style={{marginTop:18}}>Сравнение траекторий всех команд — на экране ведущего.</p>
+      <div className="reportSection">
+        <h3>2. Что означают итоговые результаты</h3>
+        <div className="metrics">
+          {Object.entries(r.metrics).map(([k,v])=><div className="metric" key={k}>
+            <div className="row"><b>{metricLabels[k]}</b><span>{v}/100{k==='dependency'?' ↓':''}</span></div>
+            <div className="metricBar"><i style={{width:v+'%'}}/></div>
+            {k==='dependency'&&<small>Для зависимости от AI ниже — лучше.</small>}
+          </div>)}
+        </div>
+        <div className="reportMetrics" style={{marginTop:12}}>{report.metricText.map((x,i)=><p key={i}>{x}</p>)}</div>
+      </div>
+
+      <div className="reportSection">
+        <h3>3. Как каждое решение изменило траекторию</h3>
+        <div className="choiceHistory">{report.rounds.map(x=><div className="historyRow reportRound" key={x.round}>
+          <span>0{x.round}</span>
+          <div><b>{x.question}</b><p><strong>Ваш выбор:</strong> {x.choice}</p><p>{x.effect}</p></div>
+        </div>)}</div>
+      </div>
+
+      <div className="reportSection">
+        <h3>4. Как решения сложились в одну стратегию</h3>
+        <p>{report.synthesis}</p>
+      </div>
+
+      <div className="reportSection">
+        <h3>5. Что будет дальше, если ничего не менять</h3>
+        <p>{report.future}</p>
+      </div>
+
+      <div className="reportSection">
+        <h3>6. Вывод для менеджмента</h3>
+        <p>{report.management}</p>
+        <div className="fbgrid" style={{marginTop:12}}>
+          <div className="fb"><b>Сильная сторона стратегии</b><p className="muted">{r.strength}</p></div>
+          <div className="fb"><b>Главный риск</b><p className="muted">{r.risk}</p></div>
+        </div>
+        <div className="notice finalQuestion" style={{marginTop:14}}><b>Вопрос вам:</b> {r.question}</div>
+      </div>
+
+      <p className="muted" style={{marginTop:18}}>У ведущего отображаются подробные результаты всех участников. Здесь показан только ваш результат.</p>
     </div></div>;
   }
 
@@ -94,7 +131,7 @@ export default function TeamGame(){
       </div>
 
       {!already&&!saved&&<button className="btn primary submitChoice" onClick={submit} disabled={!selected||busy}>{busy?'Сохраняем решение…':'Зафиксировать решение'}</button>}
-      {(already||saved)&&<div className="feedback decisionSaved"><span className="pill">РЕШЕНИЕ ПРИНЯТО</span><h3>{saved||'Ваш выбор уже сохранён'}</h3><p className="muted">Последствия пока скрыты. Они проявятся в итоговой траектории компании после 6-го раунда.</p></div>}
+      {(already||saved)&&<div className="feedback decisionSaved"><span className="pill">РЕШЕНИЕ ПРИНЯТО</span><h3>{saved||'Ваш выбор уже сохранён'}</h3><p className="muted">Последствия пока скрыты. Они проявятся в вашем итоговом результате после 6-го раунда.</p></div>}
     </main>
   </div>;
 }
