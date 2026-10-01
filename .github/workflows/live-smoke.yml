@@ -42,6 +42,7 @@ jobs:
           echo "5. Round 1"
           curl -fsS -X POST "$BASE/api/start"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":1}" | jq -e '.ok == true' >/dev/null
           R1=$(curl -fsS -X POST "$BASE/api/submit"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"teamId\":\"$TEAM\",\"teamToken\":\"$TTOKEN\",\"round\":1,\"answer\":{\"risks\":[\"deskilling\",\"accountability\",\"junior\"],\"reasoning\":\"Успешный AI автоматизирует всё больше задач, сотрудники реже тренируют навыки, менеджеры начинают автоматически соглашаться с системой, а junior-специалисты теряют учебные задачи. Это создаёт зависимость, размывает ответственность и ослабляет кадровый резерв компании.\"}}")
+          echo "$R1" | jq -c '{mode,diagnostic,score}'
           echo "$R1" | jq -e '.score >= 0 and .score <= 10' >/dev/null
           echo "$R1" | jq -e '.mode == "ai"' >/dev/null
 
