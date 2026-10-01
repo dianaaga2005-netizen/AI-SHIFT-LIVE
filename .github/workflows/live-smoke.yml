@@ -56,5 +56,7 @@ jobs:
           echo "$FINAL" | jq -e '.teams[0].result.choices | length == 6' >/dev/null
           echo "$FINAL" | jq -e '.teams[0].result.metrics.efficiency >= 0 and .teams[0].result.metrics.efficiency <= 100' >/dev/null
           echo "$FINAL" | jq -e '.teams[0].result.metrics.dependency >= 0 and .teams[0].result.metrics.dependency <= 100' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].result.hostReport.readAloud | length > 300' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].result.hostReport.rounds | length == 6' >/dev/null
 
-          echo "SIX-ROUND TRAJECTORY SMOKE TEST PASSED"
+          echo "SIX-ROUND TRAJECTORY + HOST REPORT SMOKE TEST PASSED"
