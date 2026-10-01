@@ -27,16 +27,16 @@ jobs:
           test "$CODE" != "null"
           test "$HOST" != "null"
 
-          echo "3. Joining test team"
+          echo "3. Joining test participant"
           JOIN=$(curl -fsS -X POST "$BASE/api/join" -H 'Content-Type: application/json' -d "{\"code\":\"$CODE\",\"name\":\"Smoke Test Team\",\"members\":\"QA\",\"company\":\"Test Company\"}")
           TEAM=$(echo "$JOIN" | jq -r '.teamId')
           TTOKEN=$(echo "$JOIN" | jq -r '.teamToken')
           test "$TEAM" != "null"
           test "$TTOKEN" != "null"
 
-          echo "4. Running six rounds"
-          CHOICES=("risk_tiers" "redesign_roles" "human_themes" "red_team" "degraded_mode" "new_metrics")
-          for ROUND in 1 2 3 4 5 6; do
+          echo "4. Running seven rounds including visual signal"
+          CHOICES=("risk_tiers" "redesign_roles" "human_themes" "red_team" "investigate_control" "degraded_mode" "new_metrics")
+          for ROUND in 1 2 3 4 5 6 7; do
             curl -fsS -X POST "$BASE/api/start" -H 'Content-Type: application/json' -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":$ROUND}" | jq -e '.ok == true' >/dev/null
             INDEX=$((ROUND-1))
             CHOICE="${CHOICES[$INDEX]}"
@@ -53,10 +53,10 @@ jobs:
           FINAL=$(curl -fsS "$BASE/api/state?code=$CODE")
           echo "$FINAL" | jq -e '.meta.status == "finished"' >/dev/null
           echo "$FINAL" | jq -e '.teams[0].result.title != null' >/dev/null
-          echo "$FINAL" | jq -e '.teams[0].result.choices | length == 6' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].result.choices | length == 7' >/dev/null
           echo "$FINAL" | jq -e '.teams[0].result.metrics.efficiency >= 0 and .teams[0].result.metrics.efficiency <= 100' >/dev/null
           echo "$FINAL" | jq -e '.teams[0].result.metrics.dependency >= 0 and .teams[0].result.metrics.dependency <= 100' >/dev/null
           echo "$FINAL" | jq -e '.teams[0].result.hostReport.readAloud | length > 300' >/dev/null
-          echo "$FINAL" | jq -e '.teams[0].result.hostReport.rounds | length == 6' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].result.hostReport.rounds | length == 7' >/dev/null
 
-          echo "SIX-ROUND TRAJECTORY + HOST REPORT SMOKE TEST PASSED"
+          echo "SEVEN-ROUND VISUAL TRAJECTORY + HOST REPORT SMOKE TEST PASSED"
