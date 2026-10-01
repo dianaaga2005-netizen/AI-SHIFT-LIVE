@@ -141,7 +141,7 @@ export default function HostDash(){
 
             <h3 style={{marginTop:20}}>Какие решения выбирали чаще всего</h3>
             <div className="choiceHistory">
-              {state.meta.summary.rounds?.map(x=><div className="historyRow" key={x.round}><span>0{x.round}</span><div><b>{x.question}</b><p>{x.choice} · {x.count} команд</p></div></div>)}
+              {state.meta.summary.rounds?.map(x=><div className="historyRow" key={x.round}><span>0{x.round}</span><div><b>{x.question}</b><p>{x.choice} · {x.count} участников</p></div></div>)}
             </div>
 
             <div className="notice finalQuestion" style={{marginTop:14}}><b>Вопрос для финальной дискуссии:</b> {state.meta.summary.question}</div>
