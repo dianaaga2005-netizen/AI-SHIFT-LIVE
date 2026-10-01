@@ -28,45 +28,33 @@ jobs:
           test "$HOST" != "null"
 
           echo "3. Joining test team"
-          JOIN=$(curl -fsS -X POST "$BASE/api/join"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"name\":\"Smoke Test Team\",\"members\":\"QA\",\"company\":\"Test Company\"}")
+          JOIN=$(curl -fsS -X POST "$BASE/api/join" -H 'Content-Type: application/json' -d "{\"code\":\"$CODE\",\"name\":\"Smoke Test Team\",\"members\":\"QA\",\"company\":\"Test Company\"}")
           TEAM=$(echo "$JOIN" | jq -r '.teamId')
           TTOKEN=$(echo "$JOIN" | jq -r '.teamToken')
           test "$TEAM" != "null"
           test "$TTOKEN" != "null"
 
-          echo "4. Checking lobby state"
-          STATE=$(curl -fsS "$BASE/api/state?code=$CODE")
-          echo "$STATE" | jq -e '.meta.status == "lobby"' >/dev/null
-          echo "$STATE" | jq -e '.teams | length == 1' >/dev/null
+          echo "4. Running six rounds"
+          CHOICES=("risk_tiers" "redesign_roles" "human_themes" "red_team" "degraded_mode" "new_metrics")
+          for ROUND in 1 2 3 4 5 6; do
+            curl -fsS -X POST "$BASE/api/start" -H 'Content-Type: application/json' -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":$ROUND}" | jq -e '.ok == true' >/dev/null
+            INDEX=$((ROUND-1))
+            CHOICE="${CHOICES[$INDEX]}"
+            SUBMIT=$(curl -fsS -X POST "$BASE/api/submit" -H 'Content-Type: application/json' -d "{\"code\":\"$CODE\",\"teamId\":\"$TEAM\",\"teamToken\":\"$TTOKEN\",\"round\":$ROUND,\"choice\":\"$CHOICE\"}")
+            echo "$SUBMIT" | jq -e '.ok == true' >/dev/null
+            echo "$SUBMIT" | jq -e '.optionTitle != null' >/dev/null
+          done
 
-          echo "5. Round 1"
-          curl -fsS -X POST "$BASE/api/start"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":1}" | jq -e '.ok == true' >/dev/null
-          R1=$(curl -fsS -X POST "$BASE/api/submit"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"teamId\":\"$TEAM\",\"teamToken\":\"$TTOKEN\",\"round\":1,\"answer\":{\"risks\":[\"deskilling\",\"accountability\",\"junior\"],\"reasoning\":\"Успешный AI автоматизирует всё больше задач, сотрудники реже тренируют навыки, менеджеры начинают автоматически соглашаться с системой, а junior-специалисты теряют учебные задачи. Это создаёт зависимость, размывает ответственность и ослабляет кадровый резерв компании.\"}}")
-          echo "$R1" | jq -c '{mode,score,criteria}'
-          echo "$R1" | jq -e '.score >= 0 and .score <= 10' >/dev/null
-          echo "$R1" | jq -e '.mode == "rubric"' >/dev/null
-
-          echo "6. Round 2"
-          curl -fsS -X POST "$BASE/api/start"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":2}" | jq -e '.ok == true' >/dev/null
-          STATE2=$(curl -fsS "$BASE/api/state?code=$CODE")
-          echo "$STATE2" | jq -e '.teams[0].crisis != null' >/dev/null
-          R2=$(curl -fsS -X POST "$BASE/api/submit"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"teamId\":\"$TEAM\",\"teamToken\":\"$TTOKEN\",\"round\":2,\"answer\":{\"decision\":\"Вводим обязательную человеческую проверку только для решений с высоким влиянием, сохраняя автоматизацию рутинных случаев. Менеджер должен объяснить согласие или несогласие с AI.\",\"responsibility\":\"Руководитель подразделения\",\"tradeoff\":\"Часть решений станет медленнее ради сохранения ответственности и навыков\",\"reviewCondition\":\"Пересмотр через месяц или раньше, если качество решений упадёт более чем на 10 процентов\"}}")
-          echo "$R2" | jq -e '.score >= 0 and .score <= 10' >/dev/null
-          echo "$R2" | jq -e '.mode == "rubric"' >/dev/null
-
-          echo "7. Round 3"
-          curl -fsS -X POST "$BASE/api/start"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":3}" | jq -e '.ok == true' >/dev/null
-          R3=$(curl -fsS -X POST "$BASE/api/submit"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"teamId\":\"$TEAM\",\"teamToken\":\"$TTOKEN\",\"round\":3,\"answer\":{\"rules\":[\"challenge\",\"junior\",\"account\"],\"systemLogic\":\"Human Challenge Rule сохраняет критическое мышление, Junior Development Track поддерживает кадровый резерв, а Named Accountability не позволяет переложить решение на алгоритм. Вместе они закрывают навыки, развитие людей и ответственность, хотя компания сознательно принимает меньшую краткосрочную скорость.\"}}")
-          echo "$R3" | jq -e '.score >= 0 and .score <= 10' >/dev/null
-          echo "$R3" | jq -e '.mode == "rubric"' >/dev/null
-
-          echo "8. Finishing game"
-          FIN=$(curl -fsS -X POST "$BASE/api/finish"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\"}")
+          echo "5. Finishing simulation"
+          FIN=$(curl -fsS -X POST "$BASE/api/finish" -H 'Content-Type: application/json' -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\"}")
           echo "$FIN" | jq -e '.ok == true' >/dev/null
-          echo "$FIN" | jq -e '.summary.mode == "rubric"' >/dev/null
+          echo "$FIN" | jq -e '.summary.distribution | length >= 1' >/dev/null
 
           FINAL=$(curl -fsS "$BASE/api/state?code=$CODE")
           echo "$FINAL" | jq -e '.meta.status == "finished"' >/dev/null
-          echo "$FINAL" | jq -e '.teams[0].scores["1"] != null and .teams[0].scores["2"] != null and .teams[0].scores["3"] != null' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].result.title != null' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].result.choices | length == 6' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].result.metrics.efficiency >= 0 and .teams[0].result.metrics.efficiency <= 100' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].result.metrics.dependency >= 0 and .teams[0].result.metrics.dependency <= 100' >/dev/null
 
-          echo "FREE RUBRIC SMOKE TEST PASSED"
+          echo "SIX-ROUND TRAJECTORY SMOKE TEST PASSED"
