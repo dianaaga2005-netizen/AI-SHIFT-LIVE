@@ -1,2 +1,100 @@
-"use client";import {useEffect,useMemo,useState} from 'react';import {useParams} from 'next/navigation';import {risks,rules} from '../../../lib/game';
-export default function TeamGame(){const {code}=useParams();const [state,setState]=useState(null);const [me,setMe]=useState(null);const [sel,setSel]=useState([]);const [text,setText]=useState('');const [extra,setExtra]=useState({owner:'',tradeoff:'',review:''});const [feedback,setFeedback]=useState(null);const [busy,setBusy]=useState(false);const [now,setNow]=useState(Date.now());useEffect(()=>{const x=JSON.parse(localStorage.getItem('aishift_team_'+code)||'null');setMe(x);const load=async()=>{const r=await fetch('/api/state?code='+code,{cache:'no-store'});if(r.ok)setState(await r.json())};load();const a=setInterval(load,1600),b=setInterval(()=>setNow(Date.now()),500);return()=>{clearInterval(a);clearInterval(b)}},[code]);const team=state?.teams.find(t=>t.id===me?.teamId);const round=state?.meta.round||0;useEffect(()=>{setSel([]);setText('');setExtra({owner:'',tradeoff:'',review:''});setFeedback(null)},[round]);const left=useMemo(()=>{if(!state?.meta.startAt||state.meta.status!=='active')return 0;return Math.max(0,Math.ceil((state.meta.startAt+state.meta.duration*1000-now)/1000))},[state,now]);function toggle(id){setSel(s=>s.includes(id)?s.filter(x=>x!==id):(s.length<3?[...s,id]:s))}async function submit(){if(!me)return;let answer;if(round===1){if(sel.length!==3||text.trim().length<40)return alert('Выберите 3 риска и объясните причинную связь подробнее.');answer={risks:sel,reasoning:text}}else if(round===2){if(text.trim().length<50||!extra.owner||!extra.tradeoff||!extra.review)return alert('Заполните все четыре части ответа.');answer={decision:text,responsibility:extra.owner,tradeoff:extra.tradeoff,reviewCondition:extra.review}}else{if(sel.length!==3||text.trim().length<50)return alert('Выберите 3 правила и объясните, почему они работают вместе.');answer={rules:sel,systemLogic:text}}setBusy(true);const r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,teamId:me.teamId,teamToken:me.teamToken,round,answer})});const j=await r.json();setBusy(false);if(r.ok)setFeedback(j);else alert(j.error||'Ошибка')}if(!state||!team)return <div className="shell"><div className="formCard card"><h2>Подключение…</h2><p className="muted">Проверяю сессию.</p></div></div>;const already=team.status?.[round]==='evaluated';if(round===0)return <div className="shell"><div className="formCard card"><span className="pill">{team.name}</span><h2 style={{fontSize:42}}>Вы подключены</h2><p className="muted">Компания: {team.company}</p><div className="notice">Ждите, пока ведущий запустит первый раунд.</div></div></div>;if(state.meta.status==='finished')return <div className="shell"><div className="formCard card"><span className="pill">ФИНАЛ</span><h2 style={{fontSize:42}}>{team.name}</h2><div className="code">{Object.values(team.scores||{}).reduce((a,b)=>a+b,0)}/30</div><div className="grid2">{[1,2,3].map(r=><div className="feedback" key={r}><div className="row"><b>Раунд {r}</b><span className="score">{team.scores?.[r]??0}/10</span></div><p className="muted">{team.feedback?.[r]?.verdict||'Нет оценки'}</p></div>)}</div><p className="muted" style={{marginTop:18}}>Общий рейтинг и вывод по аудитории — на экране ведущего.</p></div></div>;return <div className="shell"><div className="top"><div className="brand"><div className="logo">AI</div><div><h1>{team.name}</h1><small>{team.company} · Раунд {round}</small></div></div><div className="timer">{String(Math.floor(left/60)).padStart(2,'0')}:{String(left%60).padStart(2,'0')}</div></div><main className="mainCard card">{round===1&&<><span className="pill">РАУНД 1 · 90 СЕК</span><h2 style={{fontSize:38}}>Найдите 3 скрытые цены успеха</h2><p className="muted">ИИ работает отлично. Выберите ровно три риска, которые особенно опасны именно для вашей компании, и объясните причинную цепочку: <b>успех AI → изменение поведения → управленческая проблема → последствие</b>.</p><div className="grid2">{risks.map(x=><div key={x.id} className={'opt '+(sel.includes(x.id)?'sel':'')} onClick={()=>toggle(x.id)}><h4>{x.title}</h4><p>{x.desc}</p></div>)}</div><div className="field" style={{marginTop:16}}><label>Почему именно эти три?</label><textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Свяжите риски с выбранной компанией. Не перечисляйте — объясните механизм."/></div></>}{round===2&&<><span className="pill">РАУНД 2 · 75 СЕК</span><h2 style={{fontSize:38}}>{team.crisis?.icon} {team.crisis?.title}</h2><p className="muted">{team.crisis?.text}</p><div className="field"><label>1. Ваше решение</label><textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Что конкретно меняете в управлении?"/></div><div className="grid2"><div className="field"><label>2. Кто несёт ответственность?</label><input value={extra.owner} onChange={e=>setExtra({...extra,owner:e.target.value})}/></div><div className="field"><label>3. Какой компромисс принимаете?</label><input value={extra.tradeoff} onChange={e=>setExtra({...extra,tradeoff:e.target.value})}/></div></div><div className="field"><label>4. При каком условии пересмотрите решение?</label><input value={extra.review} onChange={e=>setExtra({...extra,review:e.target.value})}/></div></>}{round===3&&<><span className="pill">РАУНД 3 · 90 СЕК</span><h2 style={{fontSize:38}}>Создайте AI‑устойчивую систему</h2><p className="muted">Выберите ровно три правила. У каждого есть польза и цена. Ваша задача — не собрать «всё хорошее», а создать работающую систему с осознанными компромиссами.</p><div className="grid2">{rules.map(x=><div key={x.id} className={'opt '+(sel.includes(x.id)?'sel':'')} onClick={()=>toggle(x.id)}><h4>{x.title}</h4><p><b>Польза:</b> {x.benefit}</p><p style={{marginTop:7}}><b>Цена:</b> {x.cost}</p></div>)}</div><div className="field" style={{marginTop:16}}><label>Почему именно эти 3 правила работают вместе?</label><textarea value={text} onChange={e=>setText(e.target.value)} placeholder="Опишите, какой риск закрывает каждое правило, где они дополняют друг друга и какую цену компания сознательно принимает."/></div></>} {!already&&!feedback&&<button className="btn primary" onClick={submit} disabled={busy} style={{width:'100%',marginTop:14}}>{busy?'Оцениваем по рубрике…':'Отправить ответ'}</button>}{(feedback||team.feedback?.[round])&&(()=>{const f=feedback||team.feedback[round];return <div className="feedback"><div className="row"><h3>Экспертная автооценка</h3><div className="score">{f.score}/10</div></div>{f.criteria?.length>0&&<div className="notice" style={{marginTop:10}}><b>Рубрика:</b> {f.criteria.map(c=>c.label+': '+c.points+'/'+c.max).join(' · ')}</div>}<div className="fbgrid" style={{marginTop:10}}><div className="fb"><b>Сильная сторона</b><p className="muted">{f.strong}</p></div><div className="fb"><b>Слепая зона</b><p className="muted">{f.blind}</p></div><div className="fb"><b>Вердикт</b><p className="muted">{f.verdict}</p></div><div className="fb"><b>Как усилить</b><p className="muted">{f.improve}</p></div></div><div className="notice" style={{marginTop:12}}>Ответ сохранён. Ждите следующего раунда.</div></div>})()}</main></div>}
+"use client";
+import {useEffect,useMemo,useState} from 'react';
+import {useParams} from 'next/navigation';
+import {rounds,metricLabels} from '../../../lib/game';
+
+export default function TeamGame(){
+  const {code}=useParams();
+  const [state,setState]=useState(null);
+  const [me,setMe]=useState(null);
+  const [selected,setSelected]=useState('');
+  const [saved,setSaved]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [now,setNow]=useState(Date.now());
+
+  useEffect(()=>{
+    const x=JSON.parse(localStorage.getItem('aishift_team_'+code)||'null');
+    setMe(x);
+    const load=async()=>{const r=await fetch('/api/state?code='+code,{cache:'no-store'});if(r.ok)setState(await r.json())};
+    load();
+    const a=setInterval(load,1400),b=setInterval(()=>setNow(Date.now()),500);
+    return()=>{clearInterval(a);clearInterval(b)};
+  },[code]);
+
+  const team=state?.teams.find(t=>t.id===me?.teamId);
+  const round=state?.meta.round||0;
+  const roundData=rounds.find(r=>r.id===round);
+
+  useEffect(()=>{setSelected('');setSaved('')},[round]);
+
+  const left=useMemo(()=>{
+    if(!state?.meta.startAt||state.meta.status!=='active')return 0;
+    return Math.max(0,Math.ceil((state.meta.startAt+state.meta.duration*1000-now)/1000));
+  },[state,now]);
+
+  async function submit(){
+    if(!me||!selected)return;
+    setBusy(true);
+    const r=await fetch('/api/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,teamId:me.teamId,teamToken:me.teamToken,round,choice:selected})});
+    const j=await r.json();setBusy(false);
+    if(r.ok)setSaved(j.optionTitle||'Выбор сохранён');
+    else alert(j.error||'Ошибка');
+  }
+
+  if(!state||!team)return <div className="shell"><div className="formCard card"><h2>Подключение…</h2><p className="muted">Проверяю сессию.</p></div></div>;
+
+  if(round===0)return <div className="shell"><div className="formCard card"><span className="pill">{team.name}</span><h2 style={{fontSize:42}}>Вы подключены</h2><p className="muted">Компания: {team.company}</p><div className="notice">Ждите запуска. Вас ждут 6 управленческих дилемм по 30 секунд.</div></div></div>;
+
+  if(state.meta.status==='finished'){
+    const r=team.result;
+    if(!r)return <div className="shell"><div className="formCard card"><h2>Формируем результат…</h2></div></div>;
+    return <div className="shell"><div className="formCard card resultCard">
+      <span className="pill">ВАША ТРАЕКТОРИЯ</span>
+      <h2 className="trajectoryTitle">{r.title}</h2>
+      <p className="trajectoryTag">{r.tagline}</p>
+      <p className="resultText">{r.description}</p>
+
+      <div className="metrics">
+        {Object.entries(r.metrics).map(([k,v])=><div className="metric" key={k}>
+          <div className="row"><b>{metricLabels[k]}</b><span>{v}/100{k==='dependency'?' ↓':''}</span></div>
+          <div className="metricBar"><i style={{width:v+'%'}}/></div>
+          {k==='dependency'&&<small>Для этого показателя ниже — лучше.</small>}
+        </div>)}
+      </div>
+
+      <div className="fbgrid" style={{marginTop:18}}>
+        <div className="fb"><b>Сильная сторона стратегии</b><p className="muted">{r.strength}</p></div>
+        <div className="fb"><b>Главный риск</b><p className="muted">{r.risk}</p></div>
+      </div>
+      <div className="notice finalQuestion" style={{marginTop:14}}><b>Вопрос вашей команде:</b> {r.question}</div>
+
+      <h3 style={{marginTop:24}}>Ваш путь</h3>
+      <div className="choiceHistory">{r.choices.map(x=><div className="historyRow" key={x.round}><span>0{x.round}</span><div><b>{x.question}</b><p>{x.choice}</p></div></div>)}</div>
+      <p className="muted" style={{marginTop:18}}>Сравнение траекторий всех команд — на экране ведущего.</p>
+    </div></div>;
+  }
+
+  const already=team.status?.[round]==='chosen';
+
+  return <div className="shell">
+    <div className="top">
+      <div className="brand"><div className="logo">AI</div><div><h1>{team.name}</h1><small>{team.company} · Раунд {round} из 6</small></div></div>
+      <div className="timer">{String(Math.floor(left/60)).padStart(2,'0')}:{String(left%60).padStart(2,'0')}</div>
+    </div>
+    <main className="mainCard card">
+      <span className="pill">{roundData?.kicker} · 30 СЕК</span>
+      <h2 className="dilemmaTitle">{roundData?.title}</h2>
+      <p className="dilemmaContext">{roundData?.context}</p>
+
+      <div className="choiceGrid">
+        {roundData?.options.map((o,i)=><button key={o.id} className={'choiceCard '+(selected===o.id?'sel':'')} onClick={()=>!already&&setSelected(o.id)} disabled={already}>
+          <span className="choiceLetter">{String.fromCharCode(65+i)}</span>
+          <div><h4>{o.title}</h4><p>{o.text}</p></div>
+        </button>)}
+      </div>
+
+      {!already&&!saved&&<button className="btn primary submitChoice" onClick={submit} disabled={!selected||busy}>{busy?'Сохраняем решение…':'Зафиксировать решение'}</button>}
+      {(already||saved)&&<div className="feedback decisionSaved"><span className="pill">РЕШЕНИЕ ПРИНЯТО</span><h3>{saved||'Ваш выбор уже сохранён'}</h3><p className="muted">Последствия пока скрыты. Они проявятся в итоговой траектории компании после 6-го раунда.</p></div>}
+    </main>
+  </div>;
+}
