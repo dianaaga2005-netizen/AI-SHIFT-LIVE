@@ -78,10 +78,52 @@ export default function HostDash(){
 
         {state?.meta.status==='finished'&&<>
           <div className="trajectoryList">
-            {(state?.teams||[]).map(t=><div className="trajectoryTeam" key={t.id}>
-              <div className="row"><div><b>{t.name}</b><div className="muted">{t.company}</div></div><span className="pill">{t.result?.title||'—'}</span></div>
+            {(state?.teams||[]).map((t,index)=><div className="trajectoryTeam hostResultCard" key={t.id}>
+              <div className="row"><div><b>{t.name}</b><div className="muted">{t.company} · {t.members||'участники не указаны'}</div></div><span className="pill">{t.result?.title||'—'}</span></div>
               <p>{t.result?.tagline}</p>
               {t.result&&<div className="miniMetrics">{Object.entries(t.result.metrics).map(([k,v])=><div key={k}><span>{metricLabels[k]}</span><b>{v}</b></div>)}</div>}
+
+              {t.result?.hostReport&&<details className="hostReport" open={index===0}>
+                <summary>Подробный результат — открыть текст для зачитывания</summary>
+
+                <div className="readAloud">
+                  <span className="pill">ТЕКСТ ДЛЯ ЗАЧИТЫВАНИЯ</span>
+                  <h3>{t.result.hostReport.title}</h3>
+                  <p>{t.result.hostReport.readAloud}</p>
+                </div>
+
+                <div className="reportSection">
+                  <h4>1. К какому состоянию пришла компания</h4>
+                  <p>{t.result.hostReport.opening}</p>
+                  <p>{t.result.hostReport.state}</p>
+                </div>
+
+                <div className="reportSection">
+                  <h4>2. Что означают итоговые показатели</h4>
+                  <div className="reportMetrics">{t.result.hostReport.metricText.map((x,i)=><p key={i}>{x}</p>)}</div>
+                </div>
+
+                <div className="reportSection">
+                  <h4>3. Как каждое решение изменило траекторию</h4>
+                  <div className="choiceHistory">{t.result.hostReport.rounds.map(x=><div className="historyRow reportRound" key={x.round}><span>0{x.round}</span><div><b>{x.question}</b><p><strong>Выбор:</strong> {x.choice}</p><p>{x.effect}</p></div></div>)}</div>
+                </div>
+
+                <div className="reportSection">
+                  <h4>4. Как решения сложились в одну стратегию</h4>
+                  <p>{t.result.hostReport.synthesis}</p>
+                </div>
+
+                <div className="reportSection">
+                  <h4>5. Что будет дальше, если ничего не менять</h4>
+                  <p>{t.result.hostReport.future}</p>
+                </div>
+
+                <div className="reportSection">
+                  <h4>6. Вывод для менеджмента</h4>
+                  <p>{t.result.hostReport.management}</p>
+                  <div className="notice finalQuestion"><b>Вопрос команде:</b> {t.result.question}</div>
+                </div>
+              </details>}
             </div>)}
           </div>
 
