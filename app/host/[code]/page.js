@@ -48,7 +48,7 @@ export default function HostDash(){
 
         <div style={{marginTop:20}}>
           <div className="muted">Текущий раунд</div>
-          <div style={{fontSize:30,fontWeight:950}}>{state?.meta.round?state.meta.round+'/6':'Лобби'}</div>
+          <div style={{fontSize:30,fontWeight:950}}>{state?.meta.round?state.meta.round+'/7':'Лобби'}</div>
           <div className="timer">{String(Math.floor(left/60)).padStart(2,'0')}:{String(left%60).padStart(2,'0')}</div>
           {state?.meta.round>0&&<div className="notice" style={{marginTop:8}}>Выбрали: <b>{answered}/{total}</b></div>}
         </div>
@@ -66,7 +66,7 @@ export default function HostDash(){
         </div>
 
         {state?.meta.status!=='finished'&&<>
-          {current&&<div className="notice scenarioPreview" style={{marginTop:16}}><b>{current.kicker}:</b> {current.context}</div>}
+          {current&&<div className="notice scenarioPreview" style={{marginTop:16}}><b>{current.kicker}:</b> {current.context}{current.type==='visual'&&<div className="hostSignalFlag">Визуальный раунд: первые 6 секунд участники видят только диагностический экран.</div>}</div>}
           <div className="teams">
             {(state?.teams||[]).map(t=>{
               const r=state?.meta.round||1;
