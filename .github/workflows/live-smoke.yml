@@ -1,0 +1,67 @@
+name: Live smoke test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test deployed game end-to-end
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://ai-shift-live-76eo.vercel.app"
+
+          echo "1. Checking public pages"
+          curl -fsS "$BASE/" | grep -q "AI SHIFT LIVE"
+          curl -fsS "$BASE/host" | grep -q "Создать игровую сессию"
+          curl -fsS "$BASE/team" | grep -q "Подключиться"
+
+          echo "2. Creating session"
+          CREATE=$(curl -fsS -X POST "$BASE/api/create")
+          CODE=$(echo "$CREATE" | jq -r '.code')
+          HOST=$(echo "$CREATE" | jq -r '.hostToken')
+          test "$CODE" != "null"
+          test "$HOST" != "null"
+
+          echo "3. Joining test team"
+          JOIN=$(curl -fsS -X POST "$BASE/api/join"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"name\":\"Smoke Test Team\",\"members\":\"QA\",\"company\":\"Test Company\"}")
+          TEAM=$(echo "$JOIN" | jq -r '.teamId')
+          TTOKEN=$(echo "$JOIN" | jq -r '.teamToken')
+          test "$TEAM" != "null"
+          test "$TTOKEN" != "null"
+
+          echo "4. Checking lobby state"
+          STATE=$(curl -fsS "$BASE/api/state?code=$CODE")
+          echo "$STATE" | jq -e '.meta.status == "lobby"' >/dev/null
+          echo "$STATE" | jq -e '.teams | length == 1' >/dev/null
+
+          echo "5. Round 1"
+          curl -fsS -X POST "$BASE/api/start"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":1}" | jq -e '.ok == true' >/dev/null
+          R1=$(curl -fsS -X POST "$BASE/api/submit"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"teamId\":\"$TEAM\",\"teamToken\":\"$TTOKEN\",\"round\":1,\"answer\":{\"risks\":[\"deskilling\",\"accountability\",\"junior\"],\"reasoning\":\"Успешный AI автоматизирует всё больше задач, сотрудники реже тренируют навыки, менеджеры начинают автоматически соглашаться с системой, а junior-специалисты теряют учебные задачи. Это создаёт зависимость, размывает ответственность и ослабляет кадровый резерв компании.\"}}")
+          echo "$R1" | jq -e '.score >= 0 and .score <= 10' >/dev/null
+
+          echo "6. Round 2"
+          curl -fsS -X POST "$BASE/api/start"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":2}" | jq -e '.ok == true' >/dev/null
+          STATE2=$(curl -fsS "$BASE/api/state?code=$CODE")
+          echo "$STATE2" | jq -e '.teams[0].crisis != null' >/dev/null
+          R2=$(curl -fsS -X POST "$BASE/api/submit"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"teamId\":\"$TEAM\",\"teamToken\":\"$TTOKEN\",\"round\":2,\"answer\":{\"decision\":\"Вводим обязательную человеческую проверку только для решений с высоким влиянием, сохраняя автоматизацию рутинных случаев. Менеджер должен объяснить согласие или несогласие с AI.\",\"responsibility\":\"Руководитель подразделения\",\"tradeoff\":\"Часть решений станет медленнее ради сохранения ответственности и навыков\",\"reviewCondition\":\"Пересмотр через месяц или раньше, если качество решений упадёт более чем на 10 процентов\"}}")
+          echo "$R2" | jq -e '.score >= 0 and .score <= 10' >/dev/null
+
+          echo "7. Round 3"
+          curl -fsS -X POST "$BASE/api/start"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\",\"round\":3}" | jq -e '.ok == true' >/dev/null
+          R3=$(curl -fsS -X POST "$BASE/api/submit"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"teamId\":\"$TEAM\",\"teamToken\":\"$TTOKEN\",\"round\":3,\"answer\":{\"rules\":[\"challenge\",\"junior\",\"account\"],\"systemLogic\":\"Human Challenge Rule сохраняет критическое мышление, Junior Development Track поддерживает кадровый резерв, а Named Accountability не позволяет переложить решение на алгоритм. Вместе они закрывают навыки, развитие людей и ответственность, хотя компания сознательно принимает меньшую краткосрочную скорость.\"}}")
+          echo "$R3" | jq -e '.score >= 0 and .score <= 10' >/dev/null
+
+          echo "8. Finishing game"
+          FIN=$(curl -fsS -X POST "$BASE/api/finish"             -H 'Content-Type: application/json'             -d "{\"code\":\"$CODE\",\"hostToken\":\"$HOST\"}")
+          echo "$FIN" | jq -e '.ok == true' >/dev/null
+
+          FINAL=$(curl -fsS "$BASE/api/state?code=$CODE")
+          echo "$FINAL" | jq -e '.meta.status == "finished"' >/dev/null
+          echo "$FINAL" | jq -e '.teams[0].scores["1"] != null and .teams[0].scores["2"] != null and .teams[0].scores["3"] != null' >/dev/null
+
+          echo "SMOKE TEST PASSED"
