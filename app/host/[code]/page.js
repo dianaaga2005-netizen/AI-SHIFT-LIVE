@@ -1,2 +1,111 @@
-"use client";import {useEffect,useMemo,useState} from 'react';import {useParams} from 'next/navigation';import Link from 'next/link';
-export default function HostDash(){const {code}=useParams();const [state,setState]=useState(null);const [err,setErr]=useState('');const [now,setNow]=useState(Date.now());const token=typeof window!=='undefined'?localStorage.getItem('aishift_host_'+code):'';async function load(){const x=await fetch('/api/state?code='+code,{cache:'no-store'});if(x.ok)setState(await x.json())}useEffect(()=>{load();const a=setInterval(load,1800),b=setInterval(()=>setNow(Date.now()),500);return()=>{clearInterval(a);clearInterval(b)}},[code]);async function start(round){setErr('');const x=await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,hostToken:token,round})});if(!x.ok)setErr((await x.json()).error||'Ошибка');load()}async function finish(){await fetch('/api/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,hostToken:token})});load()}const left=useMemo(()=>{if(!state?.meta.startAt||state.meta.status!=='active')return state?.meta.duration||0;return Math.max(0,Math.ceil((state.meta.startAt+state.meta.duration*1000-now)/1000))},[state,now]);const sorted=[...(state?.teams||[])].sort((a,b)=>(Object.values(b.scores||{}).reduce((x,y)=>x+y,0))-(Object.values(a.scores||{}).reduce((x,y)=>x+y,0)));return <div className="shell"><div className="top"><div className="brand"><div className="logo">AI</div><div><h1>AI SHIFT LIVE</h1><small>Ведущий · сессия {code}</small></div></div><Link className="btn ghost" href="/">Главная</Link></div>{err&&<div className="notice error">{err}</div>}<div className="dash"><aside className="side card"><div className="pill">КОД ДЛЯ КОМАНД</div><div className="code">{code}</div><div className="notice">Команды: откройте этот сайт → «Я участник» → введите код.</div><div style={{marginTop:20}}><div className="muted">Текущий раунд</div><div style={{fontSize:30,fontWeight:950}}>{state?.meta.round||'Лобби'}</div><div className="timer">{String(Math.floor(left/60)).padStart(2,'0')}:{String(left%60).padStart(2,'0')}</div></div><div className="actions"><button className="btn" onClick={()=>start(1)}>Раунд 1</button><button className="btn" onClick={()=>start(2)}>Раунд 2</button><button className="btn" onClick={()=>start(3)}>Раунд 3</button><button className="btn primary" onClick={finish}>Финал</button></div></aside><main className="mainCard card"><div className="row"><div><span className="pill">LIVE DASHBOARD</span><h2 style={{fontSize:38,margin:'10px 0 0'}}>Команды отвечают одновременно</h2></div><div className="score">{state?.teams.length||0} команд</div></div><div className="teams">{(state?.teams||[]).map(t=>{const r=state?.meta.round||1;const st=t.status?.[r]||'waiting';const total=Object.values(t.scores||{}).reduce((a,b)=>a+b,0);return <div className="team" key={t.id}><div className="row"><div><b>{t.name}</b><small>{t.company} · {t.members||'участники не указаны'}</small><span className={'status '+(st==='evaluated'?'evaluated':st==='submitted'?'submitted':'thinking')}>{st==='evaluated'?'ОЦЕНЕНО':st==='submitted'?'СДАЛ':'ДУМАЕТ'}</span></div><div className="score">{total}/30</div></div></div>})}</div>{state?.meta.status==='finished'&&<><h3 style={{marginTop:28}}>Итоговый рейтинг</h3><div className="leader">{sorted.map((t,i)=><div className="leaderRow" key={t.id}><div className="rank">{i+1}</div><div><b>{t.name}</b><div className="muted">{t.company}</div></div><div className="score">{Object.values(t.scores||{}).reduce((a,b)=>a+b,0)}/30</div></div>)}</div>{state.meta.summary&&<div className="feedback"><h3>Общий вывод по аудитории</h3><div className="fbgrid" style={{marginTop:10}}><div className="fb"><b>Что поняли лучше всего</b><p className="muted">{state.meta.summary.best}</p></div><div className="fb"><b>Что чаще недооценивали</b><p className="muted">{state.meta.summary.blind}</p></div></div><div className="notice" style={{marginTop:12}}><b>Вопрос для финальной дискуссии:</b> {state.meta.summary.question}</div></div>}</>}</main></div></div>}
+"use client";
+import {useEffect,useMemo,useState} from 'react';
+import {useParams} from 'next/navigation';
+import Link from 'next/link';
+import {rounds,metricLabels} from '../../../lib/game';
+
+export default function HostDash(){
+  const {code}=useParams();
+  const [state,setState]=useState(null);
+  const [err,setErr]=useState('');
+  const [now,setNow]=useState(Date.now());
+  const token=typeof window!=='undefined'?localStorage.getItem('aishift_host_'+code):'';
+
+  async function load(){const x=await fetch('/api/state?code='+code,{cache:'no-store'});if(x.ok)setState(await x.json())}
+  useEffect(()=>{load();const a=setInterval(load,1500),b=setInterval(()=>setNow(Date.now()),500);return()=>{clearInterval(a);clearInterval(b)}},[code]);
+
+  async function start(round){
+    setErr('');
+    const x=await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,hostToken:token,round})});
+    if(!x.ok)setErr((await x.json()).error||'Ошибка');
+    load();
+  }
+  async function finish(){
+    setErr('');
+    const x=await fetch('/api/finish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,hostToken:token})});
+    if(!x.ok)setErr((await x.json()).error||'Ошибка');
+    load();
+  }
+
+  const left=useMemo(()=>{
+    if(!state?.meta.startAt||state.meta.status!=='active')return state?.meta.duration||0;
+    return Math.max(0,Math.ceil((state.meta.startAt+state.meta.duration*1000-now)/1000));
+  },[state,now]);
+
+  const current=rounds.find(r=>r.id===state?.meta.round);
+  const answered=state?.teams.filter(t=>t.status?.[state?.meta.round]==='chosen').length||0;
+  const total=state?.teams.length||0;
+
+  return <div className="shell">
+    <div className="top"><div className="brand"><div className="logo">AI</div><div><h1>AI SHIFT LIVE</h1><small>Ведущий · сессия {code}</small></div></div><Link className="btn ghost" href="/">Главная</Link></div>
+    {err&&<div className="notice error">{err}</div>}
+
+    <div className="dash">
+      <aside className="side card">
+        <div className="pill">КОД ДЛЯ КОМАНД</div>
+        <div className="code">{code}</div>
+        <div className="notice">Команды открывают сайт → «Я участник» → вводят этот код.</div>
+
+        <div style={{marginTop:20}}>
+          <div className="muted">Текущий раунд</div>
+          <div style={{fontSize:30,fontWeight:950}}>{state?.meta.round?state.meta.round+'/6':'Лобби'}</div>
+          <div className="timer">{String(Math.floor(left/60)).padStart(2,'0')}:{String(left%60).padStart(2,'0')}</div>
+          {state?.meta.round>0&&<div className="notice" style={{marginTop:8}}>Выбрали: <b>{answered}/{total}</b></div>}
+        </div>
+
+        <div className="roundButtons">
+          {rounds.map(r=><button className={'btn '+(state?.meta.round===r.id?'activeRound':'')} key={r.id} onClick={()=>start(r.id)}>Раунд {r.id}</button>)}
+        </div>
+        <button className="btn primary" onClick={finish} style={{width:'100%',marginTop:10}}>Показать финал</button>
+      </aside>
+
+      <main className="mainCard card">
+        <div className="row">
+          <div><span className="pill">LIVE SIMULATION</span><h2 style={{fontSize:38,margin:'10px 0 0'}}>{state?.meta.status==='finished'?'Траектории команд':current?.title||'Команды подключаются'}</h2></div>
+          <div className="score">{total} команд</div>
+        </div>
+
+        {state?.meta.status!=='finished'&&<>
+          {current&&<div className="notice scenarioPreview" style={{marginTop:16}}><b>{current.kicker}:</b> {current.context}</div>}
+          <div className="teams">
+            {(state?.teams||[]).map(t=>{
+              const r=state?.meta.round||1;
+              const st=t.status?.[r]||'waiting';
+              return <div className="team" key={t.id}><div className="row"><div><b>{t.name}</b><small>{t.company} · {t.members||'участники не указаны'}</small><span className={'status '+(st==='chosen'?'evaluated':'thinking')}>{st==='chosen'?'ВЫБРАЛИ':'ДУМАЮТ'}</span></div><div className="pill">{st==='chosen'?'✓':'…'}</div></div></div>
+            })}
+          </div>
+        </>}
+
+        {state?.meta.status==='finished'&&<>
+          <div className="trajectoryList">
+            {(state?.teams||[]).map(t=><div className="trajectoryTeam" key={t.id}>
+              <div className="row"><div><b>{t.name}</b><div className="muted">{t.company}</div></div><span className="pill">{t.result?.title||'—'}</span></div>
+              <p>{t.result?.tagline}</p>
+              {t.result&&<div className="miniMetrics">{Object.entries(t.result.metrics).map(([k,v])=><div key={k}><span>{metricLabels[k]}</span><b>{v}</b></div>)}</div>}
+            </div>)}
+          </div>
+
+          {state.meta.summary&&<div className="feedback">
+            <h3>Что получилось у аудитории</h3>
+            <div className="distribution">
+              {state.meta.summary.distribution?.map(x=><div className="distRow" key={x.title}><b>{x.title}</b><span>{x.count} команд</span></div>)}
+            </div>
+
+            <div className="fbgrid" style={{marginTop:14}}>
+              <div className="fb"><b>Средняя сильная сторона</b><p className="muted">{state.meta.summary.strongest.label}: {state.meta.summary.strongest.value}/100</p></div>
+              <div className="fb"><b>Средняя слабая сторона</b><p className="muted">{state.meta.summary.weakest.label}: {state.meta.summary.weakest.value}/100</p></div>
+            </div>
+            <div className="notice" style={{marginTop:12}}>{state.meta.summary.insight}</div>
+
+            <h3 style={{marginTop:20}}>Какие решения выбирали чаще всего</h3>
+            <div className="choiceHistory">
+              {state.meta.summary.rounds?.map(x=><div className="historyRow" key={x.round}><span>0{x.round}</span><div><b>{x.question}</b><p>{x.choice} · {x.count} команд</p></div></div>)}
+            </div>
+
+            <div className="notice finalQuestion" style={{marginTop:14}}><b>Вопрос для финальной дискуссии:</b> {state.meta.summary.question}</div>
+          </div>}
+        </>}
+      </main>
+    </div>
+  </div>;
+}
