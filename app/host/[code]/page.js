@@ -42,9 +42,9 @@ export default function HostDash(){
 
     <div className="dash">
       <aside className="side card">
-        <div className="pill">КОД ДЛЯ КОМАНД</div>
+        <div className="pill">КОД ДЛЯ УЧАСТНИКОВ</div>
         <div className="code">{code}</div>
-        <div className="notice">Команды открывают сайт → «Я участник» → вводят этот код.</div>
+        <div className="notice">Участники открывают сайт → «Я участник» → вводят этот код.</div>
 
         <div style={{marginTop:20}}>
           <div className="muted">Текущий раунд</div>
@@ -61,8 +61,8 @@ export default function HostDash(){
 
       <main className="mainCard card">
         <div className="row">
-          <div><span className="pill">LIVE SIMULATION</span><h2 style={{fontSize:38,margin:'10px 0 0'}}>{state?.meta.status==='finished'?'Траектории команд':current?.title||'Команды подключаются'}</h2></div>
-          <div className="score">{total} команд</div>
+          <div><span className="pill">LIVE SIMULATION</span><h2 style={{fontSize:38,margin:'10px 0 0'}}>{state?.meta.status==='finished'?'Результаты участников':current?.title||'Участники подключаются'}</h2></div>
+          <div className="score">{total} участников</div>
         </div>
 
         {state?.meta.status!=='finished'&&<>
@@ -71,7 +71,7 @@ export default function HostDash(){
             {(state?.teams||[]).map(t=>{
               const r=state?.meta.round||1;
               const st=t.status?.[r]||'waiting';
-              return <div className="team" key={t.id}><div className="row"><div><b>{t.name}</b><small>{t.company} · {t.members||'участники не указаны'}</small><span className={'status '+(st==='chosen'?'evaluated':'thinking')}>{st==='chosen'?'ВЫБРАЛИ':'ДУМАЮТ'}</span></div><div className="pill">{st==='chosen'?'✓':'…'}</div></div></div>
+              return <div className="team" key={t.id}><div className="row"><div><b>{t.name}</b><small>{t.company}</small><span className={'status '+(st==='chosen'?'evaluated':'thinking')}>{st==='chosen'?'ВЫБРАЛИ':'ДУМАЮТ'}</span></div><div className="pill">{st==='chosen'?'✓':'…'}</div></div></div>
             })}
           </div>
         </>}
@@ -79,7 +79,7 @@ export default function HostDash(){
         {state?.meta.status==='finished'&&<>
           <div className="trajectoryList">
             {(state?.teams||[]).map((t,index)=><div className="trajectoryTeam hostResultCard" key={t.id}>
-              <div className="row"><div><b>{t.name}</b><div className="muted">{t.company} · {t.members||'участники не указаны'}</div></div><span className="pill">{t.result?.title||'—'}</span></div>
+              <div className="row"><div><b>{t.name}</b><div className="muted">{t.company}</div></div><span className="pill">{t.result?.title||'—'}</span></div>
               <p>{t.result?.tagline}</p>
               {t.result&&<div className="miniMetrics">{Object.entries(t.result.metrics).map(([k,v])=><div key={k}><span>{metricLabels[k]}</span><b>{v}</b></div>)}</div>}
 
@@ -121,7 +121,7 @@ export default function HostDash(){
                 <div className="reportSection">
                   <h4>6. Вывод для менеджмента</h4>
                   <p>{t.result.hostReport.management}</p>
-                  <div className="notice finalQuestion"><b>Вопрос команде:</b> {t.result.question}</div>
+                  <div className="notice finalQuestion"><b>Вопрос участнику:</b> {t.result.question}</div>
                 </div>
               </details>}
             </div>)}
@@ -130,7 +130,7 @@ export default function HostDash(){
           {state.meta.summary&&<div className="feedback">
             <h3>Что получилось у аудитории</h3>
             <div className="distribution">
-              {state.meta.summary.distribution?.map(x=><div className="distRow" key={x.title}><b>{x.title}</b><span>{x.count} команд</span></div>)}
+              {state.meta.summary.distribution?.map(x=><div className="distRow" key={x.title}><b>{x.title}</b><span>{x.count} участников</span></div>)}
             </div>
 
             <div className="fbgrid" style={{marginTop:14}}>
